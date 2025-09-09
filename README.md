@@ -13,7 +13,7 @@ Updates:
 
 ## Demo
 
-https://felixturner.github.io/three-fluid-sim-vite/
+https://felixturner.github.io/fluid-sim/
 
 ## Screenshot
 
