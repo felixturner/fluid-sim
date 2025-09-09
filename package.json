@@ -1,0 +1,21 @@
+{
+  "name": "three-fluid-sim-vite",
+  "version": "1.0.0",
+  "description": "2D Fluid Simulation three.js implementation using Vite.",
+  "type": "module",
+  "main": "src/index.js",
+  "repository": "https://github.com/felixturner/three-fluid-sim-vite",
+  "author": "Felix Turner",
+  "license": "MIT",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.5"
+  }
+}
