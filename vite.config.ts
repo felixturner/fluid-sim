@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: './', // Use relative paths for assets
+  base: process.env.NODE_ENV === 'production' ? '/fluid-sim/' : './',
 });
