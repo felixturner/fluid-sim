@@ -1,6 +1,6 @@
-# three-fluid-sim-vite
+# fluid-sim
 
-2D Fluid Simulation Three.js implementation using Vite.
+2D Fluid Simulation using Three.js. 
 
 Forked from https://github.com/amsXYZ/three-fluid-sim
 
