@@ -6,6 +6,8 @@ import {
   WebGLRenderer,
   UnsignedByteType,
 } from 'three';
+import Stats from 'three/addons/libs/stats.module.js';
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { AdvectionPass } from './passes/AdvectionPass.js';
 import { BoundaryPass } from './passes/BoundaryPass.js';
 import { CompositionPass } from './passes/CompositionPass.js';
@@ -15,12 +17,6 @@ import { JacobiIterationsPass } from './passes/JacobiIterationsPass.js';
 import { TouchColorPass } from './passes/TouchColorPass.js';
 import { TouchForcePass } from './passes/TouchForcePass.js';
 import { RenderTarget } from './RenderTarget.js';
-
-// import Stats from 'stats.js';
-// import * as dat from 'dat.gui';
-
-import Stats from 'three/addons/libs/stats.module.js';
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 const gradients = ['gradient-2.png'];
 const gradientTextures = [];
@@ -114,13 +110,13 @@ const pressureSubstractionPass = new GradientSubstractionPass();
 const compositionPass = new CompositionPass();
 
 function onResize() {
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  renderer.setSize(w, h);
   renderer.setPixelRatio(window.devicePixelRatio);
 
-  resolution.set(
-    configuration.Scale * window.innerWidth,
-    configuration.Scale * window.innerHeight
-  );
+  resolution.set(configuration.Scale * w, configuration.Scale * h);
   velocityRT.resize(resolution);
   divergenceRT.resize(resolution);
   pressureRT.resize(resolution);
