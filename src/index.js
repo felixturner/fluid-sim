@@ -32,8 +32,8 @@ const configuration = {
   Radius: 0.25,
   Scale: 0.5,
   ColorDecay: 0.01,
+  Smoothing: 0.8,
   Boundaries: true,
-  AddColor: true,
   Visualize: 'Color',
   Mode: 'Spectral',
   Timestep: '1/60',
@@ -147,6 +147,7 @@ canvas.addEventListener('pointerdown', (event) => {
   inputTouches.push({
     id: event.pointerId,
     input: new Vector4(x, y, 0, 0),
+    smoothedInput: new Vector4(x, y, 0, 0), // Add smoothed position tracking
   });
 });
 
@@ -158,10 +159,22 @@ canvas.addEventListener('pointermove', (event) => {
   if (registeredTouch !== undefined) {
     const x = (event.clientX / canvas.clientWidth) * aspect.x;
     const y = 1.0 - (event.clientY + window.scrollY) / canvas.clientHeight;
+
+    // Apply smoothing to the position
+    const smoothing = configuration.Smoothing;
+    const newSmoothedX =
+      registeredTouch.smoothedInput.x * smoothing + x * (1 - smoothing);
+    const newSmoothedY =
+      registeredTouch.smoothedInput.y * smoothing + y * (1 - smoothing);
+
+    // Calculate velocity based on smoothed position change
     registeredTouch.input
-      .setZ(x - registeredTouch.input.x)
-      .setW(y - registeredTouch.input.y);
-    registeredTouch.input.setX(x).setY(y);
+      .setZ(newSmoothedX - registeredTouch.smoothedInput.x)
+      .setW(newSmoothedY - registeredTouch.smoothedInput.y);
+
+    // Update positions
+    registeredTouch.input.setX(newSmoothedX).setY(newSmoothedY);
+    registeredTouch.smoothedInput.setX(newSmoothedX).setY(newSmoothedY);
   }
 });
 
@@ -227,7 +240,7 @@ function initGUI() {
 
   const input = gui.addFolder('Input');
   input.add(configuration, 'Radius', 0.1, 1, 0.1);
-  input.add(configuration, 'AddColor');
+  input.add(configuration, 'Smoothing', 0.0, 0.95, 0.05).name('Smoothing');
 
   gui.add(configuration, 'Visualize', [
     'Color',
@@ -261,15 +274,13 @@ function render() {
       v = velocityRT.set(renderer);
       renderer.render(touchForceAdditionPass.scene, camera);
 
-      if (configuration.AddColor) {
-        touchColorAdditionPass.update({
-          touches: inputTouches,
-          radius: configuration.Radius,
-          color: c,
-        });
-        c = colorRT.set(renderer);
-        renderer.render(touchColorAdditionPass.scene, camera);
-      }
+      touchColorAdditionPass.update({
+        touches: inputTouches,
+        radius: configuration.Radius,
+        color: c,
+      });
+      c = colorRT.set(renderer);
+      renderer.render(touchColorAdditionPass.scene, camera);
     }
 
     // Add velocity boundaries (simulation walls).
