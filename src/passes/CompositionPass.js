@@ -35,7 +35,7 @@ export class CompositionPass {
             vUV = position * 0.5 + 0.5;
             gl_Position = vec4(position, 0.0, 1.0);
           }`,
-      fragmentShader: `
+      fragmentShader: /* glsl */ `
           precision highp float;
           precision highp int;
 
@@ -46,7 +46,8 @@ export class CompositionPass {
 
           const vec3 W = vec3(0.2125, 0.7154, 0.0721);
           float luminance(in vec3 color) {
-            return dot(color, W);
+            // Use velocity magnitude for luminance visualization
+            return length(color.rg);
           }
 
           // Based on code by Spektre posted at http://stackoverflow.com/questions/3407942/rgb-values-of-visible-spectrum
