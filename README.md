@@ -1,6 +1,6 @@
 # fluid-sim
 
-2D Fluid Simulation using Three.js. 
+2D Fluid Simulation using Three.js.
 
 Forked from https://github.com/amsXYZ/three-fluid-sim
 
@@ -9,6 +9,8 @@ Updates:
 - Migrated to Vite
 - Updated to THREE.js r180
 - Removed TypeScript
+- Fixed vertical motion brighter than horizontal motion
+- Added particles
 - Optimized
 
 ## Demo
