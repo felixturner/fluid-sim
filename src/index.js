@@ -12,39 +12,28 @@ import { AdvectionPass } from './passes/AdvectionPass.js';
 import { BoundaryPass } from './passes/BoundaryPass.js';
 import { CompositionPass } from './passes/CompositionPass.js';
 import { DivergencePass } from './passes/DivergencePass.js';
-import { GradientSubstractionPass } from './passes/GradientSubstractionPass.js';
+import { GradientSubtractionPass } from './passes/GradientSubtractionPass.js';
 import { JacobiIterationsPass } from './passes/JacobiIterationsPass.js';
 import { TouchColorPass } from './passes/TouchColorPass.js';
 import { TouchForcePass } from './passes/TouchForcePass.js';
 import { RenderTarget } from './RenderTarget.js';
+import { ParticleSystem } from './ParticleSystem.js';
 
 const gradients = ['gradient-2.png'];
 const gradientTextures = [];
 
 // App configuration options.
 const configuration = {
-  Simulate: true,
   Iterations: 32,
   Radius: 0.25,
   Scale: 0.5,
   ColorDecay: 0.01,
   Smoothing: 0.8,
-  Boundaries: true,
+  Boundaries: false,
   Visualize: 'Color',
-  Mode: 'Spectral',
+  Mode: 'Gradient',
   Timestep: '1/60',
-  Reset: () => {
-    velocityAdvectionPass.update({
-      inputTexture: velocityInitTexture,
-      velocity: velocityInitTexture,
-    });
-    colorAdvectionPass.update({
-      inputTexture: colorInitTexture,
-      velocity: velocityInitTexture,
-    });
-    v = undefined;
-    c = undefined;
-  },
+  Opacity: 1.0,
 };
 
 // Html/Three.js initialization.
@@ -95,19 +84,20 @@ const colorAdvectionPass = new AdvectionPass(
   colorInitTexture,
   configuration.ColorDecay
 );
-const touchForceAdditionPass = new TouchForcePass(
-  resolution,
-  configuration.Radius
-);
-const touchColorAdditionPass = new TouchColorPass(
-  resolution,
-  configuration.Radius
-);
-const velocityBoundary = new BoundaryPass();
-const velocityDivergencePass = new DivergencePass();
-const pressurePass = new JacobiIterationsPass();
-const pressureSubstractionPass = new GradientSubstractionPass();
+const touchForcePass = new TouchForcePass(resolution, configuration.Radius);
+const touchColorPass = new TouchColorPass(resolution, configuration.Radius);
+const boundaryPass = new BoundaryPass();
+const divergencePass = new DivergencePass();
+const jacobiIterationsPass = new JacobiIterationsPass();
+const gradientSubtractionPass = new GradientSubtractionPass();
 const compositionPass = new CompositionPass();
+
+// Particle system initialization
+const particleSystem = new ParticleSystem(
+  5000, // Default particle count
+  { width: 2, height: 2 }, // Normalized screen space bounds
+  gui
+);
 
 function onResize() {
   const w = window.innerWidth;
@@ -123,14 +113,13 @@ function onResize() {
   colorRT.resize(resolution);
 
   aspect.set(resolution.x / resolution.y, 1.0);
-  touchForceAdditionPass.update({ aspect });
-  touchColorAdditionPass.update({ aspect });
+  touchForcePass.update({ aspect });
+  touchColorPass.update({ aspect });
 
-  pressurePass.update({ resolution: resolution });
-  pressureSubstractionPass.update({ resolution: resolution });
-  velocityDivergencePass.update({ resolution: resolution });
-  velocityBoundary.update({ resolution: resolution });
-  velocityBoundary.update({ resolution: resolution });
+  jacobiIterationsPass.update({ resolution: resolution });
+  gradientSubtractionPass.update({ resolution: resolution });
+  divergencePass.update({ resolution: resolution });
+  boundaryPass.update({ resolution: resolution });
 }
 // Event listeners (resizing and mouse/touch input).
 window.addEventListener('resize', onResize);
@@ -230,9 +219,7 @@ function initGUI() {
           break;
       }
     });
-  sim.add(configuration, 'Simulate');
   sim.add(configuration, 'Boundaries');
-  sim.add(configuration, 'Reset');
 
   const input = gui.addFolder('Input');
   input.add(configuration, 'Radius', 0.1, 1, 0.1);
@@ -250,88 +237,87 @@ function initGUI() {
     'Spectral',
     'Gradient',
   ]);
+  gui.add(configuration, 'Opacity', 0.0, 1.0, 0.1).name('Opacity');
 }
 
 // Render loop.
 function render() {
-  if (configuration.Simulate) {
-    // Advect the velocity vector field.
-    velocityAdvectionPass.update({ timeDelta: dt });
-    v = velocityRT.set(renderer);
-    renderer.render(velocityAdvectionPass.scene, camera);
+  // Advect the velocity vector field.
+  velocityAdvectionPass.update({ timeDelta: dt });
+  v = velocityRT.set(renderer);
+  renderer.render(velocityAdvectionPass.scene, camera);
 
-    // Add external forces/colors according to input.
-    if (inputTouches.length > 0) {
-      touchForceAdditionPass.update({
-        touches: inputTouches,
-        radius: configuration.Radius,
-        velocity: v,
-      });
-      v = velocityRT.set(renderer);
-      renderer.render(touchForceAdditionPass.scene, camera);
-
-      touchColorAdditionPass.update({
-        touches: inputTouches,
-        radius: configuration.Radius,
-        color: c,
-      });
-      c = colorRT.set(renderer);
-      renderer.render(touchColorAdditionPass.scene, camera);
-    }
-
-    // Add velocity boundaries (simulation walls).
-    if (configuration.Boundaries) {
-      velocityBoundary.update({ velocity: v });
-      v = velocityRT.set(renderer);
-      renderer.render(velocityBoundary.scene, camera);
-    }
-
-    // Compute the divergence of the advected velocity vector field.
-    velocityDivergencePass.update({
-      timeDelta: dt,
+  // Add external forces/colors according to input.
+  if (inputTouches.length > 0) {
+    touchForcePass.update({
+      touches: inputTouches,
+      radius: configuration.Radius,
       velocity: v,
     });
-    d = divergenceRT.set(renderer);
-    renderer.render(velocityDivergencePass.scene, camera);
-
-    // Compute the pressure gradient of the advected velocity vector field (using
-    // jacobi iterations).
-    pressurePass.update({ divergence: d });
-    for (let i = 0; i < configuration.Iterations; ++i) {
-      p = pressureRT.set(renderer);
-      renderer.render(pressurePass.scene, camera);
-      pressurePass.update({ previousIteration: p });
-    }
-
-    // Substract the pressure gradient from to obtain a velocity vector field with
-    // zero divergence.
-    pressureSubstractionPass.update({
-      timeDelta: dt,
-      velocity: v,
-      pressure: p,
-    });
     v = velocityRT.set(renderer);
-    renderer.render(pressureSubstractionPass.scene, camera);
+    renderer.render(touchForcePass.scene, camera);
 
-    // Advect the color buffer with the divergence-free velocity vector field.
-    colorAdvectionPass.update({
-      timeDelta: dt,
-      inputTexture: c,
-      velocity: v,
-      decay: configuration.ColorDecay,
+    touchColorPass.update({
+      touches: inputTouches,
+      radius: configuration.Radius,
+      color: c,
     });
     c = colorRT.set(renderer);
-    renderer.render(colorAdvectionPass.scene, camera);
-
-    // Feed the input of the advection passes with the last advected results.
-    velocityAdvectionPass.update({
-      inputTexture: v,
-      velocity: v,
-    });
-    colorAdvectionPass.update({
-      inputTexture: c,
-    });
+    renderer.render(touchColorPass.scene, camera);
   }
+
+  // Add velocity boundaries (simulation walls).
+  if (configuration.Boundaries) {
+    boundaryPass.update({ velocity: v });
+    v = velocityRT.set(renderer);
+    renderer.render(boundaryPass.scene, camera);
+  }
+
+  // Compute the divergence of the advected velocity vector field.
+  divergencePass.update({
+    timeDelta: dt,
+    velocity: v,
+  });
+  d = divergenceRT.set(renderer);
+  renderer.render(divergencePass.scene, camera);
+
+  // Compute the pressure gradient of the advected velocity vector field (using
+  // jacobi iterations).
+  jacobiIterationsPass.update({ divergence: d });
+  for (let i = 0; i < configuration.Iterations; ++i) {
+    p = pressureRT.set(renderer);
+    renderer.render(jacobiIterationsPass.scene, camera);
+    jacobiIterationsPass.update({ previousIteration: p });
+  }
+
+  // Substract the pressure gradient from to obtain a velocity vector field with
+  // zero divergence.
+  gradientSubtractionPass.update({
+    timeDelta: dt,
+    velocity: v,
+    pressure: p,
+  });
+  v = velocityRT.set(renderer);
+  renderer.render(gradientSubtractionPass.scene, camera);
+
+  // Advect the color buffer with the divergence-free velocity vector field.
+  colorAdvectionPass.update({
+    timeDelta: dt,
+    inputTexture: c,
+    velocity: v,
+    decay: configuration.ColorDecay,
+  });
+  c = colorRT.set(renderer);
+  renderer.render(colorAdvectionPass.scene, camera);
+
+  // Feed the input of the advection passes with the last advected results.
+  velocityAdvectionPass.update({
+    inputTexture: v,
+    velocity: v,
+  });
+  colorAdvectionPass.update({
+    inputTexture: c,
+  });
 
   // Render to the main framebuffer the desired visualization.
   renderer.setRenderTarget(null);
@@ -354,8 +340,22 @@ function render() {
     colorBuffer: visualization,
     mode: configuration.Mode,
     gradient: gradientTextures[0],
+    opacity: configuration.Opacity,
   });
   renderer.render(compositionPass.scene, camera);
+
+  // Update and render particles
+  if (particleSystem.config.ShowParticles && v && c) {
+    particleSystem.update(
+      dt,
+      v,
+      c,
+      particleSystem.config.ParticleBoundaries,
+      particleSystem.config.ParticleSpeed,
+      particleSystem.config.ParticleColors
+    );
+    renderer.render(particleSystem.scene, camera);
+  }
 }
 function animate() {
   requestAnimationFrame(animate);

@@ -22,6 +22,7 @@ export class CompositionPass {
       uniforms: {
         colorBuffer: new Uniform(Texture.DEFAULT_IMAGE),
         gradient: new Uniform(Texture.DEFAULT_IMAGE),
+        opacity: new Uniform(1.0),
       },
       defines: {
         MODE: 0,
@@ -41,6 +42,7 @@ export class CompositionPass {
           varying vec2 vUV;
           uniform sampler2D colorBuffer;
           uniform sampler2D gradient;
+          uniform float opacity;
 
           const vec3 W = vec3(0.2125, 0.7154, 0.0721);
           float luminance(in vec3 color) {
@@ -69,13 +71,15 @@ export class CompositionPass {
             vec4 color = texture2D(colorBuffer, vUV);
             float lum = luminance(abs(color.rgb));
             #if MODE == 0
-            gl_FragColor = color;
+            gl_FragColor = vec4(color.rgb, color.a * opacity);
             #elif MODE == 1
-            gl_FragColor = vec4(lum);
+            gl_FragColor = vec4(vec3(lum), opacity);
             #elif MODE == 2
-            gl_FragColor = spectral(mix(340.0, 700.0, lum));
+            vec4 spectralColor = spectral(mix(340.0, 700.0, lum));
+            gl_FragColor = vec4(spectralColor.rgb, spectralColor.a * opacity);
             #elif MODE == 3
-            gl_FragColor = texture2D(gradient, vec2(lum, 0.0));
+            vec4 gradientColor = texture2D(gradient, vec2(lum, 0.0));
+            gl_FragColor = vec4(gradientColor.rgb, gradientColor.a * opacity);
             #endif
           }`,
       depthTest: false,
@@ -113,6 +117,9 @@ export class CompositionPass {
     }
     if (uniforms.gradient !== undefined) {
       this.material.uniforms.gradient.value = uniforms.gradient;
+    }
+    if (uniforms.opacity !== undefined) {
+      this.material.uniforms.opacity.value = uniforms.opacity;
     }
   }
 }

@@ -53,7 +53,7 @@ export class TouchColorPass {
           vScaledUV = position * aspect * 0.5 + aspect * 0.5;
           gl_Position = vec4(position, 0.0, 1.0);
         }`,
-      fragmentShader: `
+      fragmentShader: /* glsl */ `
         precision highp float;
         precision highp int;
         varying vec2 vUV;
